@@ -11,7 +11,7 @@ var cheerio = require("cheerio");
 // Require all models
 var db = require("./models");
 
-var PORT = 3001;
+var PORT = 3000;
 
 // Initialize Express
 var app = express();
@@ -26,20 +26,39 @@ app.use(express.json());
 // Make public a static folder
 app.use(express.static("public"));
 
+// Set Handlebars.
+var exphbs = require("express-handlebars");
+
+app.engine("handlebars", exphbs({ defaultLayout: "main" }));
+app.set("view engine", "handlebars");
+
+
 // Connect to the Mongo DB
-mongoose.connect("mongodb://localhost/unit18Populater", { useNewUrlParser: true });
+mongoose.connect("mongodb://localhost/pdgadb", { useNewUrlParser: true });
 
 // Routes
+app.get("/", function(req, res) {
+    db.Article.find({})
+    .then((dbArticle) => {
+        console.log(dbArticle)
+      res.render('index', {result:dbArticle})
+    })
+    .catch(function (err) {
+      // If an error occurs, send the error back to the client
+      res.json(err);
+    });
+  
+})
 
 // A GET route for scraping the echoJS website
 app.get("/scrape", function (req, res) {
   // First, we grab the body of the html with axios
-  axios.get("http://www.echojs.com/").then(function (response) {
+  axios.get("http://www.pdga.com/news").then(function (response) {
     // Then, we load that into cheerio and save it to $ for a shorthand selector
     var $ = cheerio.load(response.data);
 
     // Now, we grab every h2 within an article tag, and do the following:
-    $("article h2").each(function (i, element) {
+    $("span.field-content").each(function (i, element) {
       // Save an empty result object
       var result = {};
 
@@ -47,11 +66,12 @@ app.get("/scrape", function (req, res) {
       result.title = $(this)
         .children("a")
         .text();
-      result.link = $(this)
+      result.link = `http://www.pdga.com${ $(this)
         .children("a")
-        .attr("href");
+        .attr('href')}`;
+        console.log(result)
 
-      // Create a new Article using the `result` object built from scraping
+       //Create a new Article using the `result` object built from scraping
       db.Article.create(result)
         .then(function (dbArticle) {
           // View the added result in the console
@@ -63,14 +83,16 @@ app.get("/scrape", function (req, res) {
         });
     });
 
+
     // Send a message to the client
-    res.send("Scrape Complete");
+    res.send("scrape complete");
+    
   });
 });
 
 // Route for getting all Articles from the db
 app.get("/articles", function (req, res) {
-  // TODO: Finish the route so it grabs all of the articles
+ 
   db.Article.find({})
     .then((dbArticle) => {
       res.json(dbArticle)
